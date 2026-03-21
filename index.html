@@ -362,7 +362,7 @@ async function sbFetch(table, select = '*', limit = 500) {
 async function loadData() {
   setStatus('loading', 'Loading skill registry…');
   try {
-    const skills = await sbFetch('skill_registry', 'skill_name,agent_id,agent_division,category,description,status', 500);
+    const skills = await sbFetch('skill_registry', 'skill_name,agent_id,agent_division,description,status,security_level', 500);
     processData(skills);
     setStatus('live', `Live · ${skills.length} skills loaded · Last refreshed ${new Date().toLocaleTimeString('en-AU')}`);
   } catch (e) {
