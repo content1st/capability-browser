@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Elevaite · Capability Browser</title>
+<style>
+  :root {
+    --bg: #0d0f14;
+    --bg2: #13161e;
+    --bg3: #1a1e28;
+    --border: #252a38;
+    --text: #e2e8f0;
+    --text-dim: #64748b;
+    --text-muted: #94a3b8;
+    --accent: #6366f1;
+    --accent-glow: rgba(99,102,241,0.15);
+    --accent2: #22d3ee;
+    --green: #10b981;
+    --amber: #f59e0b;
+    --red: #ef4444;
+    --pink: #ec4899;
+    --purple: #a855f7;
+    --orange: #f97316;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Inter', system-ui, sans-serif; font-size: 13px; line-height: 1.5; min-height: 100vh; }
+
+  /* ── Setup Banner ── */
+  #setup-banner {
+    background: linear-gradient(135deg, #1e1b4b, #0f172a);
+    border-bottom: 1px solid var(--accent);
+    padding: 16px 24px;
+    display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  }
+  #setup-banner.hidden { display: none; }
+  #setup-banner .setup-label { color: var(--accent); font-weight: 600; white-space: nowrap; }
+  #setup-banner input {
+    background: var(--bg3); border: 1px solid var(--border); color: var(--text);
+    padding: 6px 12px; border-radius: 6px; font-size: 12px; flex: 1; min-width: 200px;
+    font-family: 'Courier New', monospace;
+  }
+  #setup-banner input:focus { outline: none; border-color: var(--accent); }
+  #setup-banner button {
+    background: var(--accent); color: white; border: none; padding: 7px 18px;
+    border-radius: 6px; cursor: pointer; font-weight: 600; white-space: nowrap;
+  }
+  #setup-banner button:hover { background: #4f46e5; }
+  #setup-banner .hint { color: var(--text-dim); font-size: 11px; width: 100%; }
+
+  /* ── Header ── */
+  header {
+    background: var(--bg2); border-bottom: 1px solid var(--border);
+    padding: 14px 24px; display: flex; align-items: center; justify-content: space-between;
+  }
+  .logo { display: flex; align-items: center; gap: 10px; }
+  .logo-icon { width: 28px; height: 28px; background: var(--accent); border-radius: 6px;
+    display: flex; align-items: center; justify-content: center; font-size: 14px; }
+  .logo-text { font-size: 15px; font-weight: 700; letter-spacing: -0.3px; }
+  .logo-sub { color: var(--text-dim); font-size: 11px; margin-left: 4px; }
+  .header-stats { display: flex; gap: 20px; }
+  .stat { text-align: right; }
+  .stat-val { font-size: 18px; font-weight: 700; color: var(--accent); }
+  .stat-label { font-size: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; }
+
+  /* ── Status bar ── */
+  #status-bar {
+    background: var(--bg2); border-bottom: 1px solid var(--border);
+    padding: 8px 24px; display: flex; align-items: center; gap: 12px;
+  }
+  #status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-dim); }
+  #status-dot.live { background: var(--green); box-shadow: 0 0 6px var(--green); }
+  #status-dot.error { background: var(--red); }
+  #status-text { color: var(--text-muted); font-size: 11px; }
+  .refresh-btn {
+    margin-left: auto; background: none; border: 1px solid var(--border); color: var(--text-muted);
+    padding: 3px 10px; border-radius: 4px; cursor: pointer; font-size: 11px;
+  }
+  .refresh-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* ── Layout ── */
+  .app { display: grid; grid-template-columns: 1fr 1fr; height: calc(100vh - 120px); }
+  .panel { display: flex; flex-direction: column; overflow: hidden; }
+  .panel + .panel { border-left: 1px solid var(--border); }
+
+  .panel-header {
+    padding: 12px 16px; background: var(--bg2); border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px; flex-shrink: 0;
+  }
+  .panel-title { font-weight: 600; font-size: 13px; }
+  .panel-count {
+    background: var(--bg3); border: 1px solid var(--border); color: var(--text-muted);
+    font-size: 10px; padding: 1px 7px; border-radius: 10px; font-weight: 600;
+  }
+  .search-wrap { margin-left: auto; position: relative; }
+  .search-wrap input {
+    background: var(--bg3); border: 1px solid var(--border); color: var(--text);
+    padding: 5px 10px 5px 28px; border-radius: 6px; font-size: 11px; width: 160px;
+  }
+  .search-wrap input:focus { outline: none; border-color: var(--accent); width: 200px; }
+  .search-wrap::before { content: '⌕'; position: absolute; left: 8px; top: 50%; transform: translateY(-50%); color: var(--text-dim); font-size: 13px; }
+
+  /* ── Filter chips ── */
+  .filters { padding: 8px 12px; display: flex; gap: 6px; flex-wrap: wrap; flex-shrink: 0; border-bottom: 1px solid var(--border); background: var(--bg2); }
+  .chip {
+    background: var(--bg3); border: 1px solid var(--border); color: var(--text-dim);
+    padding: 2px 10px; border-radius: 12px; cursor: pointer; font-size: 10px; font-weight: 500;
+    transition: all 0.15s; white-space: nowrap;
+  }
+  .chip:hover { border-color: var(--accent); color: var(--accent); }
+  .chip.active { background: var(--accent-glow); border-color: var(--accent); color: var(--accent); }
+
+  /* ── List ── */
+  .list { overflow-y: auto; flex: 1; }
+  .list::-webkit-scrollbar { width: 4px; }
+  .list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  /* ── Agent card ── */
+  .agent-card {
+    padding: 10px 14px; border-bottom: 1px solid var(--border);
+    cursor: pointer; transition: background 0.12s; display: flex; align-items: flex-start; gap: 10px;
+  }
+  .agent-card:hover { background: var(--bg3); }
+  .agent-card.selected { background: var(--accent-glow); border-left: 3px solid var(--accent); padding-left: 11px; }
+  .agent-card.dim { opacity: 0.35; }
+  .agent-avatar {
+    width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center;
+    justify-content: center; font-size: 13px; font-weight: 700; flex-shrink: 0; color: white;
+  }
+  .agent-info { flex: 1; min-width: 0; }
+  .agent-name { font-weight: 600; font-size: 12px; font-family: 'Courier New', monospace; color: var(--text); }
+  .agent-label { font-size: 11px; color: var(--text-dim); }
+  .agent-desc { font-size: 10px; color: var(--text-dim); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .agent-meta { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+  .skill-badge {
+    background: var(--accent-glow); border: 1px solid var(--accent); color: var(--accent);
+    font-size: 10px; font-weight: 700; padding: 1px 7px; border-radius: 8px;
+    cursor: pointer; white-space: nowrap;
+  }
+  .div-tag {
+    font-size: 9px; padding: 1px 6px; border-radius: 4px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+
+  /* ── Skill card ── */
+  .skill-card {
+    padding: 10px 14px; border-bottom: 1px solid var(--border);
+    cursor: pointer; transition: background 0.12s;
+  }
+  .skill-card:hover { background: var(--bg3); }
+  .skill-card.selected { background: var(--accent-glow); border-left: 3px solid var(--accent); padding-left: 11px; }
+  .skill-card.highlighted { background: rgba(34,211,238,0.08); border-left: 3px solid var(--accent2); padding-left: 11px; }
+  .skill-card.dim { opacity: 0.25; }
+  .skill-header { display: flex; align-items: center; gap: 8px; }
+  .skill-name { font-family: 'Courier New', monospace; font-size: 11px; font-weight: 700; color: var(--text); }
+  .skill-desc { font-size: 10px; color: var(--text-dim); margin-top: 3px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .skill-meta { display: flex; gap: 6px; align-items: center; margin-top: 4px; }
+  .agent-tag {
+    font-size: 10px; padding: 1px 8px; border-radius: 10px; font-weight: 600;
+    background: rgba(99,102,241,0.12); border: 1px solid rgba(99,102,241,0.3); color: #a5b4fc;
+    cursor: pointer;
+  }
+  .agent-tag:hover { background: var(--accent-glow); border-color: var(--accent); }
+  .source-tag {
+    font-size: 9px; padding: 1px 6px; border-radius: 4px; font-weight: 600;
+  }
+  .source-internal { background: rgba(99,102,241,0.1); color: #818cf8; }
+  .source-community { background: rgba(34,211,238,0.1); color: #67e8f9; }
+  .source-custom { background: rgba(168,85,247,0.1); color: #c084fc; }
+  .unassigned-tag { font-size: 10px; color: var(--text-dim); padding: 1px 8px; border-radius: 10px; background: var(--bg3); border: 1px solid var(--border); }
+
+  /* ── Detail panel overlay ── */
+  #detail-panel {
+    position: fixed; right: 0; top: 0; bottom: 0; width: 380px;
+    background: var(--bg2); border-left: 1px solid var(--border);
+    transform: translateX(100%); transition: transform 0.2s ease;
+    z-index: 100; display: flex; flex-direction: column; overflow: hidden;
+  }
+  #detail-panel.open { transform: translateX(0); }
+  .detail-close {
+    position: absolute; top: 12px; right: 14px; background: none; border: none;
+    color: var(--text-dim); cursor: pointer; font-size: 18px; line-height: 1;
+  }
+  .detail-close:hover { color: var(--text); }
+  #detail-content { padding: 20px; overflow-y: auto; flex: 1; }
+  .detail-type { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); margin-bottom: 6px; }
+  .detail-name { font-size: 18px; font-weight: 700; font-family: 'Courier New', monospace; margin-bottom: 4px; }
+  .detail-label { font-size: 13px; color: var(--text-muted); margin-bottom: 16px; }
+  .detail-section { margin-top: 20px; }
+  .detail-section-title { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); margin-bottom: 8px; border-bottom: 1px solid var(--border); padding-bottom: 4px; }
+  .detail-desc { font-size: 12px; color: var(--text-muted); line-height: 1.6; }
+  .detail-chip-wrap { display: flex; flex-wrap: wrap; gap: 6px; }
+  .detail-chip {
+    background: var(--bg3); border: 1px solid var(--border); color: var(--text-muted);
+    padding: 3px 10px; border-radius: 6px; font-size: 11px; font-family: 'Courier New', monospace;
+    cursor: pointer; transition: all 0.12s;
+  }
+  .detail-chip:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* ── Division colours ── */
+  .div-engineering { background: rgba(99,102,241,0.15); color: #818cf8; }
+  .div-operations { background: rgba(16,185,129,0.15); color: #34d399; }
+  .div-marketing { background: rgba(245,158,11,0.15); color: #fbbf24; }
+  .div-sales { background: rgba(239,68,68,0.15); color: #f87171; }
+  .div-delivery { background: rgba(168,85,247,0.15); color: #c084fc; }
+  .div-cross { background: rgba(34,211,238,0.15); color: #67e8f9; }
+  .div-product { background: rgba(249,115,22,0.15); color: #fb923c; }
+  .div-support { background: rgba(20,184,166,0.15); color: #2dd4bf; }
+  .div-other { background: rgba(100,116,139,0.15); color: #94a3b8; }
+
+  .avatar-engineering { background: linear-gradient(135deg, #4f46e5, #7c3aed); }
+  .avatar-operations { background: linear-gradient(135deg, #059669, #0891b2); }
+  .avatar-marketing { background: linear-gradient(135deg, #d97706, #dc2626); }
+  .avatar-sales { background: linear-gradient(135deg, #dc2626, #9333ea); }
+  .avatar-delivery { background: linear-gradient(135deg, #7c3aed, #db2777); }
+  .avatar-cross { background: linear-gradient(135deg, #0891b2, #0d9488); }
+  .avatar-product { background: linear-gradient(135deg, #ea580c, #d97706); }
+  .avatar-support { background: linear-gradient(135deg, #0d9488, #059669); }
+  .avatar-other { background: linear-gradient(135deg, #475569, #334155); }
+
+  /* ── Empty state ── */
+  .empty { padding: 40px 20px; text-align: center; color: var(--text-dim); }
+  .empty-icon { font-size: 32px; margin-bottom: 10px; }
+  .empty-text { font-size: 12px; }
+
+  /* ── Loading ── */
+  .loading { display: flex; align-items: center; justify-content: center; padding: 60px; gap: 10px; color: var(--text-dim); }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .spinner { width: 16px; height: 16px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
+</style>
+</head>
+<body>
+
+<!-- Setup Banner (hidden by default - key is pre-configured) -->
+<div id="setup-banner" class="hidden">
+  <span class="setup-label">🔑 Connect to ORB</span>
+  <input id="input-url" type="text" value="https://bmxhtfzxhqycnrqntxao.supabase.co" placeholder="Supabase URL" />
+  <input id="input-key" type="password" placeholder="Paste anon key from Supabase → API Settings" style="flex:2" />
+  <button onclick="connect()">Connect</button>
+  <span class="hint">Get the anon key from: supabase.com/dashboard/project/bmxhtfzxhqycnrqntxao/settings/api</span>
+</div>
+
+<!-- Header -->
+<header>
+  <div class="logo">
+    <div class="logo-icon">🧠</div>
+    <span class="logo-text">Elevaite</span>
+    <span class="logo-sub">Capability Browser</span>
+  </div>
+  <div class="header-stats">
+    <div class="stat">
+      <div class="stat-val" id="stat-agents">—</div>
+      <div class="stat-label">Agents</div>
+    </div>
+    <div class="stat">
+      <div class="stat-val" id="stat-skills">—</div>
+      <div class="stat-label">Skills</div>
+    </div>
+    <div class="stat">
+      <div class="stat-val" id="stat-divisions">—</div>
+      <div class="stat-label">Divisions</div>
+    </div>
+  </div>
+</header>
+
+<!-- Status bar -->
+<div id="status-bar">
+  <div id="status-dot"></div>
+  <span id="status-text">Not connected — enter your ORB Supabase anon key above</span>
+  <button class="refresh-btn" onclick="loadData()">↻ Refresh</button>
+</div>
+
+<!-- Main app -->
+<div class="app">
+
+  <!-- Left: Agents -->
+  <div class="panel">
+    <div class="panel-header">
+      <span class="panel-title">🤖 Agents</span>
+      <span class="panel-count" id="agent-count">0</span>
+      <div class="search-wrap">
+        <input type="text" id="agent-search" placeholder="Search agents…" oninput="filterAgents()">
+      </div>
+    </div>
+    <div class="filters" id="division-filters">
+      <span class="chip active" data-div="all" onclick="filterByDivision(this)">All</span>
+    </div>
+    <div class="list" id="agent-list">
+      <div class="loading"><div class="spinner"></div> Waiting for connection…</div>
+    </div>
+  </div>
+
+  <!-- Right: Skills -->
+  <div class="panel">
+    <div class="panel-header">
+      <span class="panel-title">⚡ Skills</span>
+      <span class="panel-count" id="skill-count">0</span>
+      <div class="search-wrap">
+        <input type="text" id="skill-search" placeholder="Search skills…" oninput="filterSkills()">
+      </div>
+    </div>
+    <div class="filters" id="category-filters">
+      <span class="chip active" data-cat="all" onclick="filterByCategory(this)">All</span>
+      <span class="chip" data-cat="assigned" onclick="filterByCategory(this)">Assigned</span>
+      <span class="chip" data-cat="unassigned" onclick="filterByCategory(this)">Unassigned</span>
+    </div>
+    <div class="list" id="skill-list">
+      <div class="loading"><div class="spinner"></div> Waiting for connection…</div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Detail panel -->
+<div id="detail-panel">
+  <button class="detail-close" onclick="closeDetail()">✕</button>
+  <div id="detail-content"></div>
+</div>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────
+let SUPABASE_URL = 'https://bmxhtfzxhqycnrqntxao.supabase.co';
+let SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJteGh0Znp4aHF5Y25ycW50eGFvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYyMTEzOTMsImV4cCI6MjA4MTc4NzM5M30.a8xM8Cy0ICJ-7RZVPyE6Uh38H1ZKAcHNJ7_kMcTHPGs';
+let allAgents = [];
+let allSkills = [];
+let selectedAgent = null;
+let selectedSkill = null;
+let divisionFilter = 'all';
+let categoryFilter = 'all';
+
+// ── Connect ────────────────────────────────────────────────────────────────
+function connect() {
+  SUPABASE_URL = document.getElementById('input-url').value.trim().replace(/\/$/, '');
+  SUPABASE_KEY = document.getElementById('input-key').value.trim();
+  if (!SUPABASE_KEY) { alert('Please enter your Supabase anon key'); return; }
+  localStorage.setItem('orb_url', SUPABASE_URL);
+  localStorage.setItem('orb_key', SUPABASE_KEY);
+  document.getElementById('setup-banner').classList.add('hidden');
+  loadData();
+}
+
+// ── Auto-connect — key is pre-configured ──────────────────────────────────
+function tryAutoConnect() {
+  loadData();
+}
+
+// ── Fetch from Supabase ────────────────────────────────────────────────────
+async function sbFetch(table, select = '*', limit = 500) {
+  const url = `${SUPABASE_URL}/rest/v1/${table}?select=${select}&limit=${limit}`;
+  const res = await fetch(url, {
+    headers: {
+      'apikey': SUPABASE_KEY,
+      'Authorization': `Bearer ${SUPABASE_KEY}`,
+      'Content-Type': 'application/json'
+    }
+  });
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+  return res.json();
+}
+
+// ── Load data ─────────────────────────────────────────────────────────────
+async function loadData() {
+  setStatus('loading', 'Loading skill registry…');
+  try {
+    const skills = await sbFetch('skill_registry', 'skill_name,agent_id,agent_division,category,description,status', 500);
+    processData(skills);
+    setStatus('live', `Live · ${skills.length} skills loaded · Last refreshed ${new Date().toLocaleTimeString('en-AU')}`);
+  } catch (e) {
+    setStatus('error', `Error: ${e.message} — Check your anon key and try again`);
+    document.getElementById('setup-banner').classList.remove('hidden');
+    document.getElementById('agent-list').innerHTML = '<div class="empty"><div class="empty-icon">⚠️</div><div class="empty-text">Connection failed. Enter your API key above.</div></div>';
+    document.getElementById('skill-list').innerHTML = '<div class="empty"><div class="empty-icon">⚠️</div><div class="empty-text">Connection failed. Enter your API key above.</div></div>';
+  }
+}
+
+// ── Process raw skill_registry data ───────────────────────────────────────
+function processData(skills) {
+  allSkills = skills;
+
+  // Build agent map
+  const agentMap = {};
+  for (const s of skills) {
+    if (!s.agent_id) continue;
+    if (!agentMap[s.agent_id]) {
+      agentMap[s.agent_id] = {
+        id: s.agent_id,
+        division: s.agent_division || 'other',
+        skills: [],
+        categories: new Set()
+      };
+    }
+    agentMap[s.agent_id].skills.push(s.skill_name);
+    if (s.category) agentMap[s.agent_id].categories.add(s.category);
+  }
+  allAgents = Object.values(agentMap).sort((a, b) => {
+    const da = divisionOrder(a.division), db = divisionOrder(b.division);
+    return da - db || a.id.localeCompare(b.id);
+  });
+
+  // Stats
+  const divisions = new Set(allAgents.map(a => a.division));
+  document.getElementById('stat-agents').textContent = allAgents.length;
+  document.getElementById('stat-skills').textContent = skills.length;
+  document.getElementById('stat-divisions').textContent = divisions.size;
+  document.getElementById('agent-count').textContent = allAgents.length;
+  document.getElementById('skill-count').textContent = skills.length;
+
+  // Division filter chips
+  buildDivisionFilters(divisions);
+
+  renderAgents();
+  renderSkills();
+}
+
+function divisionOrder(d) {
+  const o = { engineering: 1, operations: 2, 'cross-cutting': 3, marketing: 4, sales: 5, delivery: 6, product: 7, support: 8 };
+  return o[d?.toLowerCase()] || 99;
+}
+
+// ── Division filters ───────────────────────────────────────────────────────
+function buildDivisionFilters(divisions) {
+  const wrap = document.getElementById('division-filters');
+  wrap.innerHTML = '<span class="chip active" data-div="all" onclick="filterByDivision(this)">All</span>';
+  const sorted = [...divisions].sort((a, b) => divisionOrder(a) - divisionOrder(b));
+  for (const d of sorted) {
+    const chip = document.createElement('span');
+    chip.className = 'chip';
+    chip.dataset.div = d;
+    chip.textContent = formatDiv(d);
+    chip.onclick = () => filterByDivision(chip);
+    wrap.appendChild(chip);
+  }
+}
+
+function filterByDivision(chip) {
+  document.querySelectorAll('#division-filters .chip').forEach(c => c.classList.remove('active'));
+  chip.classList.add('active');
+  divisionFilter = chip.dataset.div;
+  selectedAgent = null;
+  selectedSkill = null;
+  renderAgents();
+  renderSkills();
+}
+
+function filterByCategory(chip) {
+  document.querySelectorAll('#category-filters .chip').forEach(c => c.classList.remove('active'));
+  chip.classList.add('active');
+  categoryFilter = chip.dataset.cat;
+  renderSkills();
+}
+
+// ── Render Agents ──────────────────────────────────────────────────────────
+function renderAgents() {
+  const search = document.getElementById('agent-search').value.toLowerCase();
+  let agents = allAgents;
+  if (divisionFilter !== 'all') agents = agents.filter(a => a.division === divisionFilter);
+  if (search) agents = agents.filter(a => a.id.toLowerCase().includes(search));
+
+  document.getElementById('agent-count').textContent = agents.length;
+
+  if (!agents.length) {
+    document.getElementById('agent-list').innerHTML = '<div class="empty"><div class="empty-icon">🤖</div><div class="empty-text">No agents match your search</div></div>';
+    return;
+  }
+
+  const highlightedSkillNames = selectedSkill ? new Set(allSkills.filter(s => s.skill_name === selectedSkill).map(s => s.agent_id)) : null;
+
+  document.getElementById('agent-list').innerHTML = agents.map(a => {
+    const divKey = divClass(a.division);
+    const isSelected = selectedAgent === a.id;
+    const isDim = selectedSkill && !highlightedSkillNames?.has(a.id);
+    const initial = a.id.charAt(0).toUpperCase();
+    return `
+      <div class="agent-card ${isSelected ? 'selected' : ''} ${isDim ? 'dim' : ''}" onclick="selectAgent('${a.id}')">
+        <div class="agent-avatar avatar-${divKey}">${initial}</div>
+        <div class="agent-info">
+          <div class="agent-name">${a.id}</div>
+          <div class="agent-label">
+            <span class="div-tag div-${divKey}">${formatDiv(a.division)}</span>
+          </div>
+        </div>
+        <div class="agent-meta">
+          <span class="skill-badge" title="View skills">${a.skills.length} skill${a.skills.length !== 1 ? 's' : ''}</span>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+// ── Render Skills ──────────────────────────────────────────────────────────
+function renderSkills() {
+  const search = document.getElementById('skill-search').value.toLowerCase();
+  let skills = allSkills;
+
+  if (categoryFilter === 'assigned') skills = skills.filter(s => s.agent_id);
+  if (categoryFilter === 'unassigned') skills = skills.filter(s => !s.agent_id);
+  if (search) skills = skills.filter(s => s.skill_name.toLowerCase().includes(search) || (s.description || '').toLowerCase().includes(search));
+
+  // If agent selected, highlight that agent's skills
+  const agentSkills = selectedAgent ? new Set(allAgents.find(a => a.id === selectedAgent)?.skills || []) : null;
+
+  const sorted = [...skills].sort((a, b) => {
+    if (agentSkills) {
+      const aIn = agentSkills.has(a.skill_name), bIn = agentSkills.has(b.skill_name);
+      if (aIn && !bIn) return -1;
+      if (!aIn && bIn) return 1;
+    }
+    return a.skill_name.localeCompare(b.skill_name);
+  });
+
+  document.getElementById('skill-count').textContent = sorted.length;
+
+  if (!sorted.length) {
+    document.getElementById('skill-list').innerHTML = '<div class="empty"><div class="empty-icon">⚡</div><div class="empty-text">No skills match your search</div></div>';
+    return;
+  }
+
+  document.getElementById('skill-list').innerHTML = sorted.map(s => {
+    const isSelected = selectedSkill === s.skill_name;
+    const isHighlighted = agentSkills?.has(s.skill_name);
+    const isDim = selectedAgent && !isHighlighted;
+    const sourceClass = `source-${(s.category || 'internal').toLowerCase()}`;
+    return `
+      <div class="skill-card ${isSelected ? 'selected' : ''} ${isHighlighted && !isSelected ? 'highlighted' : ''} ${isDim ? 'dim' : ''}"
+           onclick="selectSkill('${s.skill_name}')">
+        <div class="skill-header">
+          <span class="skill-name">${s.skill_name}</span>
+          ${s.category ? `<span class="source-tag ${sourceClass}">${s.category}</span>` : ''}
+          ${s.status === 'active' ? '' : `<span class="source-tag" style="background:rgba(239,68,68,0.1);color:#f87171">${s.status || ''}</span>`}
+        </div>
+        <div class="skill-desc">${s.description || '—'}</div>
+        <div class="skill-meta">
+          ${s.agent_id
+            ? `<span class="agent-tag" onclick="event.stopPropagation();selectAgent('${s.agent_id}')">${s.agent_id}</span>
+               <span class="source-tag div-${divClass(s.agent_division)}">${formatDiv(s.agent_division)}</span>`
+            : '<span class="unassigned-tag">unassigned</span>'}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+// ── Select agent ───────────────────────────────────────────────────────────
+function selectAgent(id) {
+  if (selectedAgent === id) {
+    selectedAgent = null;
+    closeDetail();
+    renderAgents();
+    renderSkills();
+    return;
+  }
+  selectedAgent = id;
+  selectedSkill = null;
+  renderAgents();
+  renderSkills();
+  showAgentDetail(id);
+}
+
+function showAgentDetail(id) {
+  const agent = allAgents.find(a => a.id === id);
+  if (!agent) return;
+  const divKey = divClass(agent.division);
+  const skills = allSkills.filter(s => s.agent_id === id);
+  document.getElementById('detail-content').innerHTML = `
+    <div class="detail-type">Agent</div>
+    <div class="detail-name">${id}</div>
+    <div class="detail-label">
+      <span class="div-tag div-${divKey}">${formatDiv(agent.division)}</span>
+    </div>
+    <div class="detail-section">
+      <div class="detail-section-title">Skills (${skills.length})</div>
+      <div class="detail-chip-wrap">
+        ${skills.map(s => `<span class="detail-chip" onclick="selectSkill('${s.skill_name}')">${s.skill_name}</span>`).join('')}
+      </div>
+    </div>
+    ${agent.categories.size > 0 ? `
+    <div class="detail-section">
+      <div class="detail-section-title">Skill Categories</div>
+      <div class="detail-chip-wrap">
+        ${[...agent.categories].map(c => `<span class="source-tag source-${c.toLowerCase()}" style="padding:3px 8px">${c}</span>`).join('')}
+      </div>
+    </div>` : ''}
+  `;
+  document.getElementById('detail-panel').classList.add('open');
+}
+
+// ── Select skill ───────────────────────────────────────────────────────────
+function selectSkill(name) {
+  if (selectedSkill === name) {
+    selectedSkill = null;
+    closeDetail();
+    renderAgents();
+    renderSkills();
+    return;
+  }
+  selectedSkill = name;
+  selectedAgent = null;
+  renderAgents();
+  renderSkills();
+  showSkillDetail(name);
+}
+
+function showSkillDetail(name) {
+  const skill = allSkills.find(s => s.skill_name === name);
+  if (!skill) return;
+  const divKey = divClass(skill.agent_division);
+  const srcClass = `source-${(skill.category || 'internal').toLowerCase()}`;
+  document.getElementById('detail-content').innerHTML = `
+    <div class="detail-type">Skill</div>
+    <div class="detail-name">${name}</div>
+    <div class="detail-label">
+      ${skill.category ? `<span class="source-tag ${srcClass}">${skill.category}</span>` : ''}
+    </div>
+    ${skill.description ? `
+    <div class="detail-section">
+      <div class="detail-section-title">Description</div>
+      <div class="detail-desc">${skill.description}</div>
+    </div>` : ''}
+    <div class="detail-section">
+      <div class="detail-section-title">Owner</div>
+      ${skill.agent_id
+        ? `<div class="detail-chip-wrap">
+            <span class="detail-chip" onclick="selectAgent('${skill.agent_id}')">${skill.agent_id}</span>
+            <span class="div-tag div-${divKey}">${formatDiv(skill.agent_division)}</span>
+           </div>`
+        : '<span class="unassigned-tag">No owner assigned</span>'}
+    </div>
+    <div class="detail-section">
+      <div class="detail-section-title">Status</div>
+      <span style="color:${skill.status === 'active' ? 'var(--green)' : 'var(--text-dim)'}">● ${skill.status || 'unknown'}</span>
+    </div>
+  `;
+  document.getElementById('detail-panel').classList.add('open');
+}
+
+// ── Filters ────────────────────────────────────────────────────────────────
+function filterAgents() { renderAgents(); }
+function filterSkills() { renderSkills(); }
+function closeDetail() { document.getElementById('detail-panel').classList.remove('open'); }
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+function divClass(div) {
+  if (!div) return 'other';
+  const d = div.toLowerCase();
+  if (d.includes('engineering')) return 'engineering';
+  if (d.includes('operation') || d.includes('ops')) return 'operations';
+  if (d.includes('marketing')) return 'marketing';
+  if (d.includes('sales')) return 'sales';
+  if (d.includes('delivery')) return 'delivery';
+  if (d.includes('cross') || d.includes('cutting')) return 'cross';
+  if (d.includes('product')) return 'product';
+  if (d.includes('support')) return 'support';
+  return 'other';
+}
+
+function formatDiv(div) {
+  if (!div) return 'Other';
+  return div.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+}
+
+function setStatus(state, msg) {
+  document.getElementById('status-dot').className = state === 'live' ? 'live' : state === 'error' ? 'error' : '';
+  document.getElementById('status-dot').style.cssText = state === 'loading' ? 'background:var(--amber);animation:spin 1s linear infinite' : '';
+  document.getElementById('status-text').textContent = msg;
+}
+
+// ── Init ───────────────────────────────────────────────────────────────────
+tryAutoConnect();
+</script>
+</body>
+</html>
